@@ -145,49 +145,40 @@ class Evaluator:
                           months: pd.Series,
                           hours: pd.Series) -> dict:
         """
-        Evaluate peak-hour performance by season.
-        
-        From proposal 7.4: "seasonal analysis (peak-hour performance across seasons)"
-        
-        Computes MAE and RMSE ONLY during peak hours (18:00-22:00) across seasons.
-        
-        Args:
-            y_true: True values
-            y_pred: Predictions
-            months: Month (1-12)
-            hours: Hour of day (0-23)
-            
-        Returns:
-            Dictionary with peak-hour metrics by season
+        Seasonal performance computed on PEAK HOURS only (18:00–22:00).
         """
+        peak_mask = hours.isin(self.peak_hours)
+
+        y_true_peak = np.asarray(y_true[peak_mask])
+        y_pred_peak = np.asarray(y_pred[peak_mask])
+        months_peak = months[peak_mask].reset_index(drop=True)
+
         seasons = {
             'Winter (Dec-Feb)': [12, 1, 2],
             'Spring (Mar-May)': [3, 4, 5],
             'Summer (Jun-Aug)': [6, 7, 8],
             'Fall (Sep-Nov)': [9, 10, 11]
         }
-        
+
         season_metrics = {}
-        peak_mask = hours.isin(self.peak_hours)
-        
         for season_name, season_months in seasons.items():
-            # Filter by both season AND peak hours
-            season_and_peak_mask = (months.isin(season_months)) & peak_mask
-            y_true_season = np.asarray(y_true[season_and_peak_mask])
-            y_pred_season = np.asarray(y_pred[season_and_peak_mask])
-            
+            season_mask = months_peak.isin(season_months)
+
+            y_true_season = y_true_peak[season_mask.values]
+            y_pred_season = y_pred_peak[season_mask.values]
+
             if len(y_true_season) == 0:
                 continue
-            
-            mae = np.mean(np.abs(y_true_season - y_pred_season))
-            rmse = np.sqrt(np.mean((y_true_season - y_pred_season) ** 2))
-            
+
+            mae = float(np.mean(np.abs(y_true_season - y_pred_season)))
+            rmse = float(np.sqrt(np.mean((y_true_season - y_pred_season) ** 2)))
+
             season_metrics[season_name] = {
-                'peak_mae': float(mae),
-                'peak_rmse': float(rmse),
-                'peak_count': int(season_and_peak_mask.sum())
+                'mae': mae,
+                'rmse': rmse,
+                'count': int(season_mask.sum())
             }
-        
+
         return season_metrics
     
     def evaluate_full(self,
@@ -242,7 +233,7 @@ class Evaluator:
         
         logger.info("\nSeasonal Peak-Hour Performance (18:00-22:00):")
         for season, metrics in seasonal_metrics.items():
-            logger.info(f"  {season}: Peak MAE={metrics['peak_mae']:.2f} MW, Peak RMSE={metrics['peak_rmse']:.2f} MW ({metrics['peak_count']} peak hours)")
+            logger.info(f"  {season}: MAE={metrics['mae']:.2f} MW, RMSE={metrics['rmse']:.2f} MW ({metrics['count']} peak hours)")
         
         return results
     

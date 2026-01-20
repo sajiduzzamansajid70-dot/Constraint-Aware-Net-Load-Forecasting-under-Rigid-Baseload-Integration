@@ -353,7 +353,7 @@ def main():
         if 'seasonal_peak_hours' in model_results:
             logger.info(f"  Seasonal Peak-Hour Performance:")
             for season, metrics in model_results['seasonal_peak_hours'].items():
-                logger.info(f"    {season}: MAE={metrics['peak_mae']:.2f} MW")
+                logger.info(f"    {season}: MAE={metrics['mae']:.2f} MW, RMSE={metrics['rmse']:.2f} MW ({metrics['count']} peak hours)")
     
     logger.info("\n" + "="*80)
     logger.info("MODEL COMPARISON SUMMARY")

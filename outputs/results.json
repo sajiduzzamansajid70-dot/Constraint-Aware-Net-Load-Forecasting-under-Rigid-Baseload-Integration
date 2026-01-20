@@ -1,0 +1,51 @@
+{
+  "full_horizon": {
+    "mae": 370.0687644981152,
+    "rmse": 614.2716344503913,
+    "mape": 0.05037154555402623,
+    "mean_true": 8619.571601721107,
+    "std_true": 2002.4650628711775
+  },
+  "peak_hours": {
+    "peak_mae": 314.1882657626652,
+    "peak_rmse": 593.250282425323,
+    "peak_count": 2497,
+    "peak_mean_true": 9600.275931117341,
+    "peak_std_true": 1961.5869198805542,
+    "under_forecast_rate": 0.697236684020825,
+    "large_under_forecast_rate": 0.18742490989187024,
+    "max_under_forecast": 5587.36474609375,
+    "max_over_forecast": -12539.02734375
+  },
+  "seasonal_peak_hours": {
+    "Winter (Dec-Feb)": {
+      "mae": 109.76297696076291,
+      "rmse": 144.5982010489493,
+      "count": 716
+    },
+    "Spring (Mar-May)": {
+      "mae": 489.82249372085926,
+      "rmse": 806.2778589820691,
+      "count": 563
+    },
+    "Summer (Jun-Aug)": {
+      "mae": 430.4460739455857,
+      "rmse": 749.4763936421355,
+      "count": 572
+    },
+    "Fall (Sep-Nov)": {
+      "mae": 284.7563310274768,
+      "rmse": 522.7637521800702,
+      "count": 646
+    }
+  },
+  "config": {
+    "rigid_baseload_mw": 2200.0,
+    "model": "A0_XGBoost",
+    "n_features": 23,
+    "train_samples": 66001,
+    "test_samples": 16501,
+    "test_date_range": "2023-05-23 16:00:00 to 2025-06-17 12:00:00",
+    "timestamp": "2026-01-21T02:03:38.387857"
+  }
+}

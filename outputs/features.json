@@ -1,0 +1,27 @@
+{
+  "features": [
+    "Temperature",
+    "Humidity",
+    "Rainfall",
+    "Sunshine",
+    "net_load_lag1h",
+    "net_load_lag2h",
+    "net_load_lag3h",
+    "net_load_lag6h",
+    "net_load_lag12h",
+    "net_load_lag24h",
+    "net_load_lag48h",
+    "net_load_lag168h",
+    "hour",
+    "day_of_week",
+    "month",
+    "day_of_month",
+    "is_peak_hour",
+    "temperature_lag12h",
+    "humidity_lag12h",
+    "temperature_lag24h",
+    "humidity_lag24h",
+    "heat_stress",
+    "heat_stress_lag24h"
+  ]
+}

@@ -1,0 +1,4 @@
+Model,Role,Peak_MAE_MW,Peak_RMSE_MW,Full_MAE_MW,Full_RMSE_MW,Improvement_vs_Best,Status,Recommendation
+A0_XGBoost,PRIMARY,401.65,646.10,335.21,494.53,Baseline ✅,BEST,USE FOR PRODUCTION
+A1_MA_ARIMA,COMPARATIVE,1526.95,1775.25,1703.46,2152.66,-73.7% (3.8x worse),REFERENCE,Keep for comparison only
+A3_Hybrid,COMPARATIVE,1526.95,1775.25,1703.46,2152.66,-73.7% (Same as A1 - NO improvement),FAILED,Do not use

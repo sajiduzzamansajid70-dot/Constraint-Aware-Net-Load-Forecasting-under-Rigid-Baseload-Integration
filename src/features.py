@@ -270,8 +270,8 @@ class FeatureEngineer:
         LOAD_SHEDDING_MAX_MW = 10000  # Maximum realistic load shedding
         SERVED_LOAD_MIN_MW = 0        # Served load cannot be negative
         SERVED_LOAD_MAX_MW = 15000    # Upper bound same as demand
-        NET_LOAD_MIN_MW = -1000       # Can be negative if demand < baseload + renewables
-        NET_LOAD_MAX_MW = 12000       # Maximum flexible load needed
+        NET_LOAD_MIN_MW = -5000       # Expanded lower bound to retain more low-load cases
+        NET_LOAD_MAX_MW = 20000       # Expanded upper bound for extreme peaks
         
         # Track removal reasons
         removal_reasons = {

@@ -56,6 +56,7 @@ class A3Hybrid:
         self.feature_columns: List[str] = []
         self.exog_columns: List[str] = []
         self.low_freq_train_last = None
+        self.residual_train = None
 
         self.allowed_exog = [
             # Calendar
@@ -78,7 +79,8 @@ class A3Hybrid:
         ]
 
     def _moving_average(self, series: pd.Series) -> pd.Series:
-        return series.rolling(window=self.ma_window, min_periods=1).mean()
+        # Causal (trailing) moving average to avoid look-ahead
+        return series.rolling(window=self.ma_window, min_periods=1, center=False).mean()
 
     def _build_lag_frame(self, residual: pd.Series) -> pd.DataFrame:
         frame = pd.DataFrame(index=residual.index)
@@ -98,6 +100,7 @@ class A3Hybrid:
         low_freq_train = self._moving_average(y_train)
         self.low_freq_train_last = low_freq_train.iloc[-1]
         residual_train = y_train - low_freq_train
+        self.residual_train = residual_train.reset_index(drop=True)
 
         # Fit ARIMA on low-frequency signal
         try:
@@ -200,13 +203,33 @@ class A3Hybrid:
 
         # Residual forecast
         if self.xgb_model is not None and self.feature_columns:
-            combined_y = pd.concat([y_train, y_test], ignore_index=True)
-            low_freq_full = self._moving_average(combined_y)
-            residual_full = combined_y - low_freq_full
+            res_seed = self.residual_train.tail(self.ma_window) if self.residual_train is not None else pd.Series([], dtype=float)
+            res_hist = list(res_seed.values)
+            residual_pred = np.zeros(horizon)
 
-            X_test = self._prepare_residual_features(residual_full, df_test, len(y_train))
-            X_test_scaled = self.scaler.transform(X_test)
-            residual_pred = self.xgb_model.predict(X_test_scaled)
+            for t in range(horizon):
+                row = {col: 0.0 for col in self.feature_columns}
+
+                for lag in self.residual_lags:
+                    key = f"residual_lag{lag}"
+                    if key in row:
+                        if len(res_hist) >= lag:
+                            row[key] = res_hist[-lag]
+                        elif res_hist:
+                            row[key] = res_hist[0]
+                        else:
+                            row[key] = 0.0
+
+                if self.exog_columns:
+                    for col in self.exog_columns:
+                        if col in row and col in df_test.columns:
+                            row[col] = float(df_test.iloc[t][col])
+
+                X_row = pd.DataFrame([row], columns=self.feature_columns).fillna(0)
+                X_scaled = self.scaler.transform(X_row)
+                r_pred = float(self.xgb_model.predict(X_scaled)[0])
+                residual_pred[t] = r_pred
+                res_hist.append(r_pred)
         else:
             residual_pred = np.zeros(horizon)
 
