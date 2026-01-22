@@ -26,6 +26,7 @@ from src.train import XGBoostModel
 from src.evaluate import Evaluator
 from src.baseline_models import A1_MA_ARIMA
 from src.models import A3Hybrid
+from src.persistence_baseline import make_persistence_predictions
 
 # Setup logging
 logging.basicConfig(
@@ -216,7 +217,25 @@ def main():
     
     # Peak hours: 18:00 - 22:00 (operational risk window)
     evaluator = Evaluator(peak_hours=[18, 19, 20, 21, 22])
-    
+        # ------------------------------------------------------------------
+    # Persistence baselines (no-learning benchmarks)
+    # ------------------------------------------------------------------
+    logger.info("\nEvaluating: Persistence Baselines")
+
+    persistence_preds = make_persistence_predictions(df_full=df_full, target_col=target_col)
+
+    for base_name, y_pred_series in persistence_preds.items():
+        # Align with test indices
+        y_pred_base = y_pred_series.loc[df_test.index].values
+
+        # If shift creates NaNs at the start, fill them with first valid value
+        if np.isnan(y_pred_base).any():
+            first_valid = y_pred_base[~np.isnan(y_pred_base)][0]
+            y_pred_base = np.where(np.isnan(y_pred_base), first_valid, y_pred_base)
+
+        predictions_all[base_name] = y_pred_base
+        model_roles[base_name] = "Baseline"
+
     # Evaluate each model
     for model_name, y_pred in predictions_all.items():
         logger.info(f"\n{'-'*80}")
@@ -387,8 +406,8 @@ def main():
     logger.info("\n" + comparison_df.to_string(index=False))
     
     # Save comparison
-    comparison_df.to_csv(outputs_dir / 'model_comparison.csv', index=False)
-    logger.info(f"\nSaved: model_comparison.csv")
+    comparison_df.to_csv(outputs_dir / "model_comparison.csv", index=False)
+    logger.info("\nSaved: model_comparison.csv")
 
     logger.info("\nOutputs saved to:")
     logger.info(f"  {outputs_dir}/")
@@ -401,7 +420,7 @@ def main():
     logger.info(f"    - features.json (feature list)")
     logger.info(f"    - models/ (trained models)")
     logger.info(f"    - plots/ (diagnostic plots by model)")
-    
+
     return results
 
 

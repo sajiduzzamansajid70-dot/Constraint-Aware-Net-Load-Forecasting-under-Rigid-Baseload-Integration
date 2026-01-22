@@ -59,16 +59,17 @@ class XGBoostModel:
             early_stopping_rounds: Early stopping patience on validation RMSE
         """
         self.model = xgb.XGBRegressor(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            learning_rate=learning_rate,
-            subsample=subsample,
-            colsample_bytree=colsample_bytree,
-            random_state=random_state,
-            objective='reg:squarederror',
-            eval_metric='rmse',
-            n_jobs=-1,
-            verbosity=1
+             n_estimators=n_estimators,
+             max_depth=max_depth,
+             learning_rate=learning_rate,
+             subsample=subsample,
+             colsample_bytree=colsample_bytree,
+             random_state=random_state,
+             objective='reg:squarederror',
+             eval_metric='rmse',
+             n_jobs=-1,
+             verbosity=1,
+             early_stopping_rounds=early_stopping_rounds
         )
         
         self.scaler = StandardScaler()
@@ -126,7 +127,6 @@ class XGBoostModel:
             y_train_fit,
             eval_set=[(X_val_scaled, y_val)],
             verbose=False,
-            early_stopping_rounds=self.early_stopping_rounds
         )
 
         self.is_fitted = True
