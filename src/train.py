@@ -124,8 +124,7 @@ class XGBoostModel:
         self.model.fit(
             X_train_scaled,
             y_train_fit,
-            eval_set=[(X_train_scaled, y_train_fit), (X_val_scaled, y_val)],
-            eval_metric="rmse",
+            eval_set=[(X_val_scaled, y_val)],
             verbose=False,
             early_stopping_rounds=self.early_stopping_rounds
         )
@@ -211,7 +210,7 @@ class XGBoostModel:
         path.mkdir(parents=True, exist_ok=True)
 
         # Save model in native XGBoost format
-        self.model.save_model(str(path / "xgboost_model.json"))
+        self.model.get_booster().save_model(str(path / "xgboost_model.json"))
 
         # Save scaler parameters
         np.save(path / "scaler_mean.npy", self.scaler.mean_)
