@@ -115,15 +115,19 @@ class Evaluator:
         mae = np.mean(np.abs(y_true_peak - y_pred_peak))
         rmse = np.sqrt(np.mean((y_true_peak - y_pred_peak) ** 2))
         
-        # Error definition: error = y_true - y_pred
-        # Under-forecast: error > 0 (predicted too low, actual > predicted)
-        # Over-forecast: error < 0 (predicted too high, actual < predicted)
-        errors = y_true_peak - y_pred_peak
-        under_forecast_rate = (errors > 0).sum() / len(errors)
-        
+        # Error definition: error = y_pred - y_true
+        # Under-forecast: error < 0 (predicted too low)
+        errors = y_pred_peak - y_true_peak
+        threshold_levels = [0, 250, 500]
+        under_forecast_rate = (errors < 0).mean()
+        under_forecast_rates = {
+            f"under_forecast_rate_{thr}mw": float((errors < -thr).mean())
+            for thr in threshold_levels
+        }
+
         # Large under-forecast events (e.g., > 500 MW underprediction)
         large_under_forecast_threshold = 500  # MW
-        large_under_forecast_rate = (errors > large_under_forecast_threshold).sum() / len(errors)
+        large_under_forecast_rate = (errors < -large_under_forecast_threshold).mean()
         
         metrics = {
             'peak_mae': float(mae),
@@ -133,8 +137,9 @@ class Evaluator:
             'peak_std_true': float(np.std(y_true_peak)),
             'under_forecast_rate': float(under_forecast_rate),
             'large_under_forecast_rate': float(large_under_forecast_rate),
-            'max_under_forecast': float(np.max(errors)),  # Largest positive error (most severe underprediction)
-            'max_over_forecast': float(np.min(errors))    # Most negative error (most severe overprediction)
+            'under_forecast_rates': under_forecast_rates,
+            'max_under_forecast': float(np.min(errors)),  # Most negative error (most severe underprediction)
+            'max_over_forecast': float(np.max(errors))    # Most positive error (most severe overprediction)
         }
         
         return metrics
@@ -226,10 +231,13 @@ class Evaluator:
         logger.info("\nPeak Hours 18:00-22:00 (PRIMARY):")
         logger.info(f"  MAE: {peak_metrics['peak_mae']:.2f} MW")
         logger.info(f"  RMSE: {peak_metrics['peak_rmse']:.2f} MW")
-        logger.info(f"  Under-forecast rate: {peak_metrics['under_forecast_rate']*100:.2f}%")
-        logger.info(f"  Large under-forecast rate (>500MW): {peak_metrics['large_under_forecast_rate']*100:.2f}%")
-        logger.info(f"  Max under-forecast: {peak_metrics['max_under_forecast']:.2f} MW")
-        logger.info(f"  Max over-forecast: {peak_metrics['max_over_forecast']:.2f} MW")
+        logger.info(f"  Under-forecast rate (<0 MW error): {peak_metrics['under_forecast_rate']*100:.2f}%")
+        uf_rates = peak_metrics.get('under_forecast_rates', {})
+        for thr_label, rate in uf_rates.items():
+            logger.info(f"  {thr_label.replace('_', ' ').title()}: {rate*100:.2f}%")
+        logger.info(f"  Large under-forecast rate (<-500MW): {peak_metrics['large_under_forecast_rate']*100:.2f}%")
+        logger.info(f"  Most negative error (worst under-forecast): {peak_metrics['max_under_forecast']:.2f} MW")
+        logger.info(f"  Most positive error (worst over-forecast): {peak_metrics['max_over_forecast']:.2f} MW")
         
         logger.info("\nSeasonal Peak-Hour Performance (18:00-22:00):")
         for season, metrics in seasonal_metrics.items():

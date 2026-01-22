@@ -93,6 +93,11 @@ def main():
     logger.info(f"  Train samples: {len(df_train)}")
     logger.info(f"  Test samples: {len(df_test)}")
     logger.info(f"  Number of features: {len(feature_cols)}")
+
+    qa_report = engineer.last_qa_report or {}
+    with open(outputs_dir / 'data_quality_report.json', 'w') as f:
+        json.dump(qa_report, f, indent=2, default=str)
+    logger.info(f"Saved: data_quality_report.json (plausibility filtering + weather alignment note)")
     
     # ==============================================================================
     # PHASE 3: MODEL TRAINING
@@ -122,12 +127,14 @@ def main():
     logger.info("\nTraining A0_XGBoost model (primary ML baseline)...")
     
     model_a0 = XGBoostModel(
-        n_estimators=200,
+        n_estimators=2000,          # allow early stopping to find optimal depth
         max_depth=6,
         learning_rate=0.1,
         subsample=0.8,
         colsample_bytree=0.8,
-        random_state=42
+        random_state=42,
+        val_fraction=0.2,
+        early_stopping_rounds=50,
     )
     
     train_metrics = model_a0.fit(X_train, y_train)
@@ -135,6 +142,9 @@ def main():
     logger.info(f"XGBoost training complete:")
     logger.info(f"  Train RMSE: {train_metrics['train_rmse']:.2f} MW")
     logger.info(f"  Train MAE: {train_metrics['train_mae']:.2f} MW")
+    logger.info(f"  Val RMSE: {train_metrics['val_rmse']:.2f} MW")
+    logger.info(f"  Val MAE: {train_metrics['val_mae']:.2f} MW")
+    logger.info(f"  Trees used (early stopping): {train_metrics['n_estimators_used']}")
     
     # Feature importance
     feature_importance = model_a0.get_feature_importance(feature_cols)

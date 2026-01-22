@@ -37,12 +37,14 @@ class XGBoostModel:
     """
     
     def __init__(self, 
-                 n_estimators: int = 200,
+                 n_estimators: int = 2000,
                  max_depth: int = 6,
                  learning_rate: float = 0.1,
                  subsample: float = 0.8,
                  colsample_bytree: float = 0.8,
-                 random_state: int = 42):
+                 random_state: int = 42,
+                 val_fraction: float = 0.2,
+                 early_stopping_rounds: int = 50):
         """
         Initialize XGBoost regressor with hyperparameters.
         
@@ -53,6 +55,8 @@ class XGBoostModel:
             subsample: Fraction of samples for each iteration
             colsample_bytree: Fraction of features for each iteration
             random_state: Random seed for reproducibility
+            val_fraction: Fraction of training data (chronologically last) reserved for validation
+            early_stopping_rounds: Early stopping patience on validation RMSE
         """
         self.model = xgb.XGBRegressor(
             n_estimators=n_estimators,
@@ -69,6 +73,9 @@ class XGBoostModel:
         
         self.scaler = StandardScaler()
         self.is_fitted = False
+        self.val_fraction = val_fraction
+        self.early_stopping_rounds = early_stopping_rounds
+        self.best_iteration = None
         
         logger.info(f"XGBoost model initialized")
         logger.info(f"  n_estimators={n_estimators}, max_depth={max_depth}, lr={learning_rate}")
@@ -79,47 +86,81 @@ class XGBoostModel:
             X_val: pd.DataFrame = None,
             y_val: pd.Series = None) -> dict:
         """
-        Fit XGBoost model on training data.
-        
+        Fit XGBoost model on training data with chronological validation.
+
         Scaling: Features are standardized using StandardScaler fit on training data only.
-        
+
         Args:
             X_train: Training features
             y_train: Training target
-            X_val: Optional validation features for early stopping
+            X_val: Optional validation features for early stopping (must be chronological tail)
             y_val: Optional validation target
-            
+
         Returns:
-            Dictionary with training metrics and history
+            Dictionary with training and validation metrics
         """
-        logger.info("Fitting XGBoost model...")
-        
-        # Fit scaler on training data only (no leakage)
-        X_train_scaled = self.scaler.fit_transform(X_train)
-        
-        # Train model (note: XGBoost 3.x simplified the early stopping interface)
-        # For compatibility with multiple versions, we fit without early stopping on test data
+        logger.info("Fitting XGBoost model with chronological validation...")
+
+        # Create a chronological train/validation split if none is provided
+        if X_val is None or y_val is None:
+            val_size = max(int(len(X_train) * self.val_fraction), 1)
+            if val_size >= len(X_train):
+                val_size = max(len(X_train) // 5, 1)
+            split_idx = len(X_train) - val_size
+            X_train_fit = X_train.iloc[:split_idx]
+            y_train_fit = y_train.iloc[:split_idx]
+            X_val = X_train.iloc[split_idx:]
+            y_val = y_train.iloc[split_idx:]
+            logger.info(f"  Auto validation split: train={len(X_train_fit)}, val={len(X_val)} (chronological tail)")
+        else:
+            X_train_fit, y_train_fit = X_train, y_train
+            logger.info(f"  Using provided validation set: train={len(X_train_fit)}, val={len(X_val)}")
+
+        # Fit scaler on training split only (no leakage into validation/test)
+        X_train_scaled = self.scaler.fit_transform(X_train_fit)
+        X_val_scaled = self.scaler.transform(X_val)
+
+        # Train with early stopping on validation RMSE
         self.model.fit(
-            X_train_scaled, 
-            y_train,
-            verbose=True
+            X_train_scaled,
+            y_train_fit,
+            eval_set=[(X_train_scaled, y_train_fit), (X_val_scaled, y_val)],
+            eval_metric="rmse",
+            verbose=False,
+            early_stopping_rounds=self.early_stopping_rounds
         )
-        
+
         self.is_fitted = True
+        self.best_iteration = getattr(self.model, "best_iteration", None)
         logger.info("Model fitting complete")
-        
-        # Training metrics
-        train_rmse = np.sqrt(np.mean((y_train - self.model.predict(X_train_scaled)) ** 2))
-        train_mae = np.mean(np.abs(y_train - self.model.predict(X_train_scaled)))
-        
+        if self.best_iteration is not None:
+            logger.info(f"  Best iteration: {self.best_iteration + 1} (early stopping)")
+
+        # Training and validation metrics at best iteration
+        train_pred = self.model.predict(
+            X_train_scaled,
+            iteration_range=(0, self.best_iteration + 1) if self.best_iteration is not None else None,
+        )
+        val_pred = self.model.predict(
+            X_val_scaled,
+            iteration_range=(0, self.best_iteration + 1) if self.best_iteration is not None else None,
+        )
+        train_rmse = np.sqrt(np.mean((y_train_fit - train_pred) ** 2))
+        train_mae = np.mean(np.abs(y_train_fit - train_pred))
+        val_rmse = np.sqrt(np.mean((y_val - val_pred) ** 2))
+        val_mae = np.mean(np.abs(y_val - val_pred))
+
         metrics = {
             'train_rmse': float(train_rmse),
             'train_mae': float(train_mae),
-            'n_estimators_used': self.model.n_estimators
+            'val_rmse': float(val_rmse),
+            'val_mae': float(val_mae),
+            'n_estimators_used': int(self.best_iteration + 1) if self.best_iteration is not None else self.model.n_estimators
         }
-        
+
         logger.info(f"Training metrics: RMSE={train_rmse:.2f}, MAE={train_mae:.2f}")
-        
+        logger.info(f"Validation metrics: RMSE={val_rmse:.2f}, MAE={val_mae:.2f}")
+
         return metrics
     
     def predict(self, X: pd.DataFrame) -> np.ndarray:
@@ -136,7 +177,8 @@ class XGBoostModel:
             raise RuntimeError("Model not fitted yet. Call fit() first.")
         
         X_scaled = self.scaler.transform(X)
-        return self.model.predict(X_scaled)
+        iteration_range = (0, self.best_iteration + 1) if self.best_iteration is not None else None
+        return self.model.predict(X_scaled, iteration_range=iteration_range)
     
     def get_feature_importance(self, feature_names: list) -> pd.DataFrame:
         """
@@ -174,6 +216,8 @@ class XGBoostModel:
         # Save scaler parameters
         np.save(path / "scaler_mean.npy", self.scaler.mean_)
         np.save(path / "scaler_scale.npy", self.scaler.scale_)
+        with open(path / "best_iteration.txt", "w") as f:
+            f.write(str(self.best_iteration if self.best_iteration is not None else -1))
 
         logger.info(f"Model saved to {path}")
     
@@ -186,6 +230,15 @@ class XGBoostModel:
         
         self.scaler.mean_ = np.load(path / "scaler_mean.npy")
         self.scaler.scale_ = np.load(path / "scaler_scale.npy")
+        best_iter_path = path / "best_iteration.txt"
+        if best_iter_path.exists():
+            try:
+                loaded_iter = int(best_iter_path.read_text().strip())
+                self.best_iteration = loaded_iter if loaded_iter >= 0 else None
+            except Exception:
+                self.best_iteration = getattr(self.model, "best_iteration", None)
+        else:
+            self.best_iteration = getattr(self.model, "best_iteration", None)
         
         self.is_fitted = True
         logger.info(f"Model loaded from {path}")

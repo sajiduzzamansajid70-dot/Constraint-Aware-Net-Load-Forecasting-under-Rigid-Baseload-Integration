@@ -59,6 +59,7 @@ constraint_aware_net_load/
 - **Coverage:** Daily observations from 35 stations (1961-2023)
 - **Columns:** Temperature, Humidity, Rainfall, Sunshine
 - **Used for:** Feature engineering (lagged weather, heat stress interactions)
+- **Alignment caveat:** Daily values are forward-filled to hourly resolution (stepwise within day); intra-day weather variability is not preserved and must be acknowledged in results.
 
 ---
 
@@ -85,8 +86,8 @@ The net load represents the residual demand that must be served by flexible gene
 ### Model: XGBoost Baseline (Section 7.2)
 - **Model:** XGBoost regression
 - **Rationale:** Scalability, robustness, interpretability via feature importance
-- **Training:** Time-series validation respecting chronology (80/20 split)
-- **Hyperparameters:** 200 estimators, max_depth=6, lr=0.1
+- **Training:** Chronological split with validation tail + early stopping (no shuffling, respects time order)
+- **Hyperparameters:** 2000 estimator budget with early stopping, max_depth=6, lr=0.1
 
 ### Evaluation: Peak-Hour Risk Focus (Section 7.3)
 **PRIMARY Metrics (Peak Hours 18:00-22:00):**

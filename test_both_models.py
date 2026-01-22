@@ -52,16 +52,25 @@ logger.info("MODEL 1: XGBoost (ML-based baseline)")
 logger.info("="*80)
 
 model_xgb = XGBoostModel(
-    n_estimators=200,
+    n_estimators=2000,
     max_depth=6,
     learning_rate=0.1,
     subsample=0.8,
     colsample_bytree=0.8,
-    random_state=42
+    random_state=42,
+    val_fraction=0.2,
+    early_stopping_rounds=50,
 )
 
 train_metrics = model_xgb.fit(X_train, y_train)
-logger.info(f"Training complete: RMSE={train_metrics['train_rmse']:.2f}, MAE={train_metrics['train_mae']:.2f}")
+logger.info(
+    f"Training complete: "
+    f"Train RMSE={train_metrics['train_rmse']:.2f}, "
+    f"Train MAE={train_metrics['train_mae']:.2f}, "
+    f"Val RMSE={train_metrics['val_rmse']:.2f}, "
+    f"Val MAE={train_metrics['val_mae']:.2f}, "
+    f"Trees used={train_metrics['n_estimators_used']}"
+)
 
 y_pred_xgb = model_xgb.predict(X_test)
 

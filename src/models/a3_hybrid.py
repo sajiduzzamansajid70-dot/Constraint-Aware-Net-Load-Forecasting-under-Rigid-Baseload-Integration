@@ -54,9 +54,11 @@ class A3Hybrid:
         self.xgb_model = None
         self.scaler = None
         self.feature_columns: List[str] = []
+        self.residual_feature_cols: List[str] = []
         self.exog_columns: List[str] = []
         self.low_freq_train_last = None
         self.residual_train = None
+        self.n_lags = max(self.residual_lags) if self.residual_lags else 0
 
         self.allowed_exog = [
             # Calendar
@@ -122,6 +124,7 @@ class A3Hybrid:
 
         X_residual = pd.concat([lag_features, exog_train], axis=1)
         y_residual = residual_train.iloc[valid_idx].reset_index(drop=True)
+        self.n_lags = max(self.residual_lags) if self.residual_lags else 0
 
         if X_residual.empty:
             logger.warning("No residual features available; residual model disabled.")
@@ -148,6 +151,7 @@ class A3Hybrid:
             )
             self.xgb_model.fit(X_scaled, y_residual)
             self.feature_columns = list(X_residual.columns)
+            self.residual_feature_cols = list(X_residual.columns)
             logger.info(
                 f"Residual XGBoost trained on {X_residual.shape[0]} samples "
                 f"with {X_residual.shape[1]} features"
@@ -156,6 +160,7 @@ class A3Hybrid:
             logger.warning(f"Residual XGBoost fitting failed ({exc}); using zero residual forecast.")
             self.xgb_model = None
             self.feature_columns = []
+            self.residual_feature_cols = []
 
     def _prepare_residual_features(
         self,
@@ -203,7 +208,7 @@ class A3Hybrid:
 
         # Residual forecast
         if self.xgb_model is not None and self.feature_columns:
-            res_seed = self.residual_train.tail(self.ma_window) if self.residual_train is not None else pd.Series([], dtype=float)
+            res_seed = self.residual_train.tail(max(self.n_lags, 1)) if self.residual_train is not None else pd.Series([], dtype=float)
             res_hist = list(res_seed.values)
             residual_pred = np.zeros(horizon)
 
@@ -247,11 +252,14 @@ class A3Hybrid:
             "xgb_n_estimators": self.xgb_n_estimators,
             "learning_rate": self.learning_rate,
             "feature_columns": self.feature_columns,
+            "residual_feature_cols": self.residual_feature_cols,
             "exog_columns": self.exog_columns,
             "low_freq_train_last": self.low_freq_train_last,
+            "residual_train": self.residual_train,
             "arima_model": self.arima_model,
             "xgb_model": self.xgb_model,
             "scaler": self.scaler,
+            "n_lags": self.n_lags,
         }
 
         with open(model_dir / f"{self.name}.pkl", "wb") as f:
@@ -268,8 +276,11 @@ class A3Hybrid:
         self.xgb_n_estimators = state["xgb_n_estimators"]
         self.learning_rate = state["learning_rate"]
         self.feature_columns = state["feature_columns"]
+        self.residual_feature_cols = state.get("residual_feature_cols", self.feature_columns)
         self.exog_columns = state["exog_columns"]
         self.low_freq_train_last = state["low_freq_train_last"]
+        self.residual_train = state.get("residual_train", None)
         self.arima_model = state["arima_model"]
         self.xgb_model = state["xgb_model"]
         self.scaler = state["scaler"]
+        self.n_lags = state.get("n_lags", max(self.residual_lags) if self.residual_lags else 0)

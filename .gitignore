@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+.vscode/
+.DS_Store
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual env
+.venv/
+venv/
+
+# Outputs / artifacts
+outputs/
+*.pkl
+*.npy
+*.json
+*.csv
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/

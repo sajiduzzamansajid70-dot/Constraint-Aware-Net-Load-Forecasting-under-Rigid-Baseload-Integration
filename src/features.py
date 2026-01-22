@@ -45,6 +45,9 @@ class FeatureEngineer:
         """
         self.rigid_baseload_mw = rigid_baseload_mw
         self.scalers = {}  # Store scalers fit on training data
+        self.last_plausibility_report = None
+        self.last_qa_report = None
+        self.weather_alignment_note = None
         logger.info(f"Feature engineer initialized with rigid baseload = {rigid_baseload_mw} MW")
     
     def construct_net_load(self, 
@@ -135,6 +138,10 @@ class FeatureEngineer:
         
         logger.info(f"  Weather aligned from station: {station}")
         logger.info(f"  Temperature: {df['Temperature'].notna().sum()} / {len(df)} values")
+        self.weather_alignment_note = (
+            "Daily weather observations forward-filled to hourly resolution; "
+            "intra-day variability is flat within each day (proposal validity caveat)."
+        )
         
         return df
     
@@ -343,6 +350,22 @@ class FeatureEngineer:
         removed_count = initial_count - len(df)
         removed_pct = 100.0 * removed_count / initial_count if initial_count > 0 else 0
         
+        report = {
+            'initial_rows': int(initial_count),
+            'retained_rows': int(len(df)),
+            'removed_rows': int(removed_count),
+            'removed_pct': float(removed_pct),
+            'removal_reasons': {k: int(v) for k, v in removal_reasons.items() if v > 0},
+            'bounds': {
+                'demand': [DEMAND_MIN_MW, DEMAND_MAX_MW],
+                'generation': [GENERATION_MIN_MW, GENERATION_MAX_MW],
+                'load_shedding': [LOAD_SHEDDING_MIN_MW, LOAD_SHEDDING_MAX_MW],
+                'served_load': [SERVED_LOAD_MIN_MW, SERVED_LOAD_MAX_MW],
+                'net_load': [NET_LOAD_MIN_MW, NET_LOAD_MAX_MW],
+            }
+        }
+        self.last_plausibility_report = report
+
         logger.info(f"Physical plausibility filtering:")
         logger.info(f"  Demand bounds: [{DEMAND_MIN_MW}, {DEMAND_MAX_MW}] MW")
         logger.info(f"  Generation bounds: [{GENERATION_MIN_MW}, {GENERATION_MAX_MW}] MW")
@@ -431,6 +454,14 @@ class FeatureEngineer:
         logger.info(f"Train/test split (chronological):")
         logger.info(f"  Train: {len(df_train)} samples ({df_train['datetime'].min()} to {df_train['datetime'].max()})")
         logger.info(f"  Test: {len(df_test)} samples ({df_test['datetime'].min()} to {df_test['datetime'].max()})")
+
+        self.last_qa_report = {
+            'lagged_rows_dropped': int(max_lag),
+            'plausibility_filter': self.last_plausibility_report,
+            'weather_alignment_note': self.weather_alignment_note,
+            'train_range': f"{df_train['datetime'].min()} to {df_train['datetime'].max()}",
+            'test_range': f"{df_test['datetime'].min()} to {df_test['datetime'].max()}",
+        }
         
         return df, df_train, df_test, feature_cols, target_col
 
