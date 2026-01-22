@@ -27,3 +27,12 @@ outputs/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Large model artifacts
+outputs/models/*.pkl
+outputs/models/*.json
+outputs/models/*.npy
+outputs/plots/
+outputs/results*.json
+outputs/test_predictions*.csv
+
