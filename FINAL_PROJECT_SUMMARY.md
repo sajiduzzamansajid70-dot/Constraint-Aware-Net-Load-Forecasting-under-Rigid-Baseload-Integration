@@ -317,3 +317,13 @@ Ready for:
 **Project Completion Date**: January 20, 2025  
 **All deliverables**: Ready for publication / deployment
 
+## Final Model Evaluation Results (Test Set)
+
+| Model        | MAE (MW) | RMSE (MW) | Peak RMSE (MW) | Role |
+|-------------|----------|-----------|---------------|------|
+| A0_XGBoost  | 567.58   | 970.50    | 1412.54       | Primary |
+| A1_MA_ARIMA | 1674.27  | 2067.93   | 2015.85       | Comparative |
+| A3_Hybrid   | 1771.29  | 2108.54   | 2013.58       | Comparative |
+
+**Conclusion:**  
+XGBoost significantly outperforms classical and hybrid baselines, especially under peak-hour stress (18:00–22:00), validating the ML value-add under rigid baseload constraints.
