@@ -318,7 +318,7 @@ class FeatureEngineer:
         
         # Check for hourly timestamp resolution (no duplicates in same hour)
         if 'datetime' in df.columns:
-            df['date_hour'] = df['datetime'].dt.floor('H')
+            df['date_hour'] = df['datetime'].dt.floor('h')
             hourly_valid = ~df.duplicated(subset=['date_hour'], keep=False)
         else:
             hourly_valid = pd.Series([True] * len(df))
